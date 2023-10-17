@@ -2,7 +2,10 @@ import os
 import platform
 import time
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Optional
+
+import typer
 from rich.console import Console
 import sys
 
@@ -11,6 +14,11 @@ from usb.core import Device, Endpoint
 
 if platform.system() == 'Darwin' and 'arm' in platform.platform():
     os.environ['DYLD_LIBRARY_PATH'] = '/opt/homebrew/lib'
+
+
+class AppMode(Enum):
+    Write = 'write'
+    Read = 'read'
 
 
 @dataclass
@@ -52,7 +60,7 @@ class App:
                 self.console.print_exception()
                 sys.exit(1)
             else:
-                self.console.print('[bold green] OK')
+                self.console.print('[bold green]OK')
 
     def set_protocol(self):
         try:
@@ -122,9 +130,33 @@ class App:
                 self.console.print('Disconnecting device......... ')
                 self.device.detach_kernel_driver(0)
 
+    def write(self):
+        cfg = self.device.get_active_configuration()
+        if_num = cfg[(0, 0)].bInterfaceNumber
+        intf = usb.util.find_descriptor(cfg, bInterfaceNumber=if_num)
 
-if __name__ == "__main__":
+        ep_out: Endpoint = usb.util.find_descriptor(
+            intf,
+            custom_match= \
+                lambda e: \
+                    usb.util.endpoint_direction(e.bEndpointAddress) == \
+                    usb.util.ENDPOINT_OUT
+        )
+        while True:
+            message = self.console.input('[bold blue]Write: ')
+            ep_out.write(message)
+
+
+def main(mode: AppMode = AppMode.Read):
     app = App()
     app.select_device()
     app.prepare_device()
-    app.accept_data()
+
+    if mode == AppMode.Write:
+        app.write()
+    else:
+        app.accept_data()
+
+
+if __name__ == "__main__":
+    typer.run(main)
