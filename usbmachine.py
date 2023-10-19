@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
+import serial, time
 
 import typer
 from rich.console import Console
@@ -19,6 +20,7 @@ if platform.system() == 'Darwin' and 'arm' in platform.platform():
 class AppMode(Enum):
     Write = 'write'
     Read = 'read'
+    WriteArduino = 'write-arduino'
 
 
 @dataclass
@@ -146,16 +148,29 @@ class App:
             message = self.console.input('[bold blue]Write: ')
             ep_out.write(message)
 
+    def write_arduino(self):
+        def send_data(data):
+            with serial.Serial('/dev/tty.usbserial-A50285BI', 9600) as ser:
+                ser.write(data.encode())
 
-def main(mode: AppMode = AppMode.Read):
+        while True:
+            user_input = input()
+            if user_input in ['0', '1']:
+                send_data(user_input)
+
+
+def main(mode: AppMode = AppMode.Read.value):
     app = App()
-    app.select_device()
-    app.prepare_device()
-
-    if mode == AppMode.Write:
-        app.write()
+    if mode == AppMode.WriteArduino:
+        app.write_arduino()
     else:
-        app.accept_data()
+        app.select_device()
+        app.prepare_device()
+
+        if mode == AppMode.Write:
+            app.write()
+        else:
+            app.accept_data()
 
 
 if __name__ == "__main__":
