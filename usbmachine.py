@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 import serial, time
+from serial.tools import list_ports
 
 import typer
 from rich.console import Console
@@ -123,7 +124,7 @@ class App:
         while True:
             try:
                 data = ep_in.read(size_or_buffer=1, timeout=0)
-                print(data[0])
+                print(bytes([data[0]]).decode())
             except usb.core.USBError as e:
                 print("failed to send IN transfer")
                 print(e)
@@ -149,14 +150,21 @@ class App:
             ep_out.write(message)
 
     def write_arduino(self):
-        def send_data(data):
-            with serial.Serial('/dev/tty.usbserial-A50285BI', 9600) as ser:
-                ser.write(data.encode())
+        ports = list(serial.tools.list_ports.comports())
+        target_port = None
+        for p in ports:
+            if 'usb' in str(p.usb_info()).lower():
+                target_port = p
+        if target_port is None:
+            self.console.print('[bold red]No USB ports found!')
+            sys.exit(1)
+        self.console.print(f'[bold blue]Writing to {target_port.device}')
 
         while True:
             user_input = input()
             if user_input in ['0', '1']:
-                send_data(user_input)
+                with serial.Serial(target_port.device, 9600) as ser:
+                    ser.write(user_input.encode())
 
 
 def main(mode: AppMode = AppMode.Read.value):
